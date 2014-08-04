@@ -16,6 +16,12 @@ check_links() {
 	fi
 }
 
+check_path() {
+	local command="$1"
+
+	which $command
+}
+
 find_shlibs() {
 	local file="$1"
 
@@ -29,6 +35,15 @@ find_shlibs() {
 
 file="$1"
 
-find_shlibs $file 
+found_shlibs+=$(find_shlibs $file) 
+
+basic_cmds="bash ls cp grep diff tail head vi bc"
+
+for commands in $(echo $basic_cmds)
+do
+	found_shlibs+=$(find_shlibs $(check_path $commands))
+done
+
+echo $found_shlibs | tr " " "\n" | sort -u
 
 exit 0
