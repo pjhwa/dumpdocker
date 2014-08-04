@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# dumpdocker
+# - creates docker image based on tar file for analysis of crash dump 
+# 
+# Last updated at Mon Aug  4 21:45:21 KST 2014
+
+check_links() {
+	local file="$1"
+	
+	if [[ -L $file ]]; then
+		echo $file 
+		readlink -f $file
+	else
+		echo $file
+	fi
+}
+
+find_shlibs() {
+	local file="$1"
+
+	ldd_files=$(ldd -v $file | grep "\/" | awk '{if ($2=="=>") print $3; if ($2!="=>") print $1}')
+	for shlibs in $ldd_files
+	do
+		check_links $shlibs
+	done
+}
+
+file="$1"
+
+find_shlibs $file 
+
+exit 0
