@@ -19,6 +19,7 @@ check_links() {
 find_shlibs() {
 	local file="$1"
 
+	check_links $file
 	ldd_files=$(ldd $file | grep "\/" | awk '{if ($2=="=>") print $3; if ($2!="=>") print $1}')
 	for shlibs in $ldd_files
 	do
