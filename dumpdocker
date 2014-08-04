@@ -35,13 +35,35 @@ find_shlibs() {
 
 file="$1"
 
+# find shared libraries for the given file
 found_shlibs+=$(find_shlibs $file) 
 
+# basic commands for docker image
 basic_cmds="bash ls cp grep diff tail head vi bc"
 
 for commands in $(echo $basic_cmds)
 do
 	found_shlibs+=$(find_shlibs $(check_path $commands))
+done
+
+# gather the shared libraries and binaries related with gdb
+gdb_bin=$(which gdb)
+found_shlibs+=$(find_shlibs $gdb_bin)
+
+# check the files which has opened by gdb
+strace $gdb_bin >/dev/null 2>/tmp/d.$$ <<EOF
+quit
+EOF
+
+gdb_files=$(grep "^open(\"" /tmp/d.$$ | awk -F'"' '{print $2}')
+for files in $gdb_files
+do
+	if [ -f $files ]; then
+		if [ -x $files ]; then
+			found_shlibs+=$(find_shlibs $files)
+		fi
+		found_shlibs+=$files
+	fi
 done
 
 echo $found_shlibs | tr " " "\n" | sort -u
