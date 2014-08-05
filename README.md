@@ -1,11 +1,9 @@
-dumpdocker
-==========
+# dumpdocker
 
 creates docker images for analysis of crash dump and generates the first pass dump analysis report from the docker image.
 
 
-Usage
-=====
+## Usage
 
 Run dumpdocker from the crashed server:
 
