@@ -3,14 +3,44 @@
 # dumpdocker
 # - creates docker image based on tar file for analysis of crash dump 
 # 
-# requirements:
+# Requirements:
 # - gdb
 #
-# usage:
-# dumpdocker </path/executable> </path/core>
+# Usage:
+# dumpdocker [-h] exec_bin core_file
 #
-# Last updated at Tue Aug  5 17:08:32 KST 2014
+# Author: Jerry Park <jaehwa@gmail.com>
+# Created on Mon Aug  4 11:23:32 KST 2014
+# Last updated at Tue Aug  6 14:35:29 KST 2014
 #set -x
+
+prog=$(basename $0)
+
+usage() {
+	echo "Usage: $prog [-h] exec_bin core_file"
+	echo "    -h		display the usage of $prog"
+	echo ""
+}
+
+while getopts h opt ; do
+        case "$opt" in
+        	h) usage; exit 0 ;;
+        	*) usage; exit 1 ;;
+        esac
+done
+
+if [ "$#" -eq "0" ]; then
+	usage; exit 1
+elif [ "$#" -lt "2" ]; then
+	usage; exit 1
+fi
+
+if [ ! -x $1 ]; then
+	usage
+	echo "$prog: please input correct executable binary as exec_bin"
+	echo ""
+	exit 2
+fi
 
 DATE=$(date +%Y%m%d%H%M)
 UNAME=$(uname -n)
@@ -87,7 +117,7 @@ found_shlibs+=$(find_shlibs $gdb_bin)
 dpkg_bin=$(which dpkg 2>/dev/null)
 rpm_bin=$(which rpm 2>/dev/null)
 
-if [ "$dpkg_bin" != "" ] && [ -x $dpkg_bin ]; then
+if [ "x$dpkg_bin" != "x" ] && [ -x $dpkg_bin ]; then
 	$dpkg_bin -l gdb >/dev/null 2>&1
 	if [ $? -eq 0 ]; then
 		$dpkg_bin -L gdb > /tmp/d.pkg.$$ 2>/dev/null
@@ -95,7 +125,7 @@ if [ "$dpkg_bin" != "" ] && [ -x $dpkg_bin ]; then
 		echo "Couldn't find gdb package."
 		exit 1
 	fi
-elif [ "$rpm_bin" != "" ] && [ -x $rpm_bin ]; then
+elif [ "x$rpm_bin" != "x" ] && [ -x $rpm_bin ]; then
 	$rpm_bin -q gdb	>/dev/null 2>&1
 	if [ $? -eq 0 ]; then
 		$rpm_bin -qvl gdb | awk '{print $9}' > /tmp/d.pkg.$$ 2>/dev/null
@@ -129,8 +159,7 @@ do
 			found_shlibs+=" "
 			found_shlibs+=$(find_shlibs $files)
 		fi
-		found_shlibs+=" "
-		found_shlibs+=$files
+		found_shlibs+=" "$files
 	fi
 done
 
