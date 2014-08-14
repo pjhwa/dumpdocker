@@ -84,16 +84,9 @@ core="$2"
 found_shlibs+=" "
 found_shlibs+=$(check_links $file) 
 
-gdb $file $core >/dev/null <<EOF
-set height 0
-set logging file /tmp/d.gdb.$$
-set logging on
-info shared
-set logging off
-quit
-EOF
+gdb $file $core -x gdb.cmd > /dev/null
 
-for sharedlibs in $(grep "\/" /tmp/d.gdb.$$ | awk -F' /' '{print "/"$2}')
+for sharedlibs in $(grep "\/" /tmp/d.gdb.tmp | awk -F' /' '{print "/"$2}')
 do
 	found_shlibs+=" "
 	found_shlibs+=$(check_links $sharedlibs)
