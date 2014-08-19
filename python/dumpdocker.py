@@ -1,95 +1,115 @@
-#
-# dumpdocker
-# - creates docker image based on tar file for analysis of crash dump 
-# 
-# Requirements:
-# - gdb
-#
-# Usage:
-# dumpdocker [-h] exec_bin core_file
-#
+'''
+Created on 2014. 8. 19.
 
-import os.path,sys
+@author: earthsea
+'''
+
+from os.path import realpath,isfile
 from optparse import OptionParser
+from time import localtime
+from socket import gethostname
+from subprocess import Popen,PIPE
+import sys,tarfile
 
-import time, socket, subprocess
-
-def exec_linux(command):
-    ret = subprocess.call("%s"%command,shell=True,stderr=open("/dev/null"),stdout=subprocess.PIPE)
-    return ret
-    
-if __name__ == '__main__':
-    
-    # option 처리 부분
-    use_desc ="%prog [-h] -e binary -c corefile "
-    parser = OptionParser(usage=use_desc)
-    parser.add_option("-e",help="crashed executable Binary",dest="binfile")
-    parser.add_option("-c",help="core file",dest="corefile")
-    
-    (opts, args) = parser.parse_args()
-    
-    if os.path 
-    
-    
-    
-    exec_bin = sys.argv[1]
-    core_file = sys.argv[2]
+def isthere(cmd,must):
+    try :
+        ret = Popen("which %s"%cmd,stdout=PIPE,stderr=open("/dev/null"))
         
-    if os.path.isfile(sys.argv[1]) :
-        sys.stderr.write("%s : please input correct executable binary as exec_bin\n" %sys.argv[0])
-        raise SystemExit[2]    
+        return realpath(ret.PIPE.read())
+    except IOError as Ierr :
+        sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
+        if must :
+            sys.exit(2)
+
+def pkgthere(cmd):
+    try :
+        ret = Popen("%s"%cmd,stdout=PIPE,stderr=open("/dev/null"))
+        return realpath(ret.PIPE.read())
+    except IOError as Ierr :
+        sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
     
-    
-    now = time.localtime()
-    DATE = now.tm_year+now.tm_mon+now.tm_mday+now.tm_hour+now.tm_min
-    uname = socket.gethostname()
-    
-    ret = subprocess.call("gdb script",shell=True,stderr=open("/dev/null"))
-    
-    try : # 파일오픈 성공여부 확인
-        with open('/tmp/d.gdb.tmp','rt') as readFile :
-            sharedlibs =  [ os.path.realpath(line) for line in readFile if line.find("/") ]
-    except IOError as err : # 파일오픈 실패시 에러 출력후 종료
-        sys.stderr.write('File Error : ' + str(err))
-            
-    basic_cmds=["bash","ls","cp","grep","cat","diff","tail","head","vi","bc","gdb"]
-    
-    for cmd in basic_cmds :
-        pathCmd = subprocess.Popen("which %s"%cmd,shell=True,stdout=subprocess.PIPE)
-        fullPathCommand = pathCmd.stdout.read()
-        result = subprocess.Popen("ldd %s"%fullPathCommand,shell=True,stdout=subprocess.PIPE)
-        resultLdd = result.stdout.read()
-        for line in resultLdd :
+def findLib(whereldd,cmd):
+    try :
+        ret = Popen("%s %s"%(whereldd,cmd),stdout=PIPE,stderr=open("/dev/null"))
+        sharedList = []
+        for line in ret.PIPE.read() :
             if line.find("/") :
                 if line.find("=>") :
-                    sharedlibs.append(line.split("=>")[1])
-                else
-                    sharedlibs.append(line)
-        
-    dpkg_bin = subprocess.Popen("which dpkg",shell=True,stdout=subprocess.PIPE).stdout.read()
-    rpm_bin = subprocess.Popen("which rpm",shell=True,stdout=subprocess.PIPE).stdout.read()
+                    sharedList.append(realpath(line.split("=>")[1]))
+                else :
+                    sharedList.append(realpath(line))
+        return sharedList
+    except IOError as Ierr :
+        sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
     
-    if dpkg_bin :
-        gdb_pkg_list = exec_linux("%s -L gdb"%dpkg_bin)
-    else
-        print("Couldn't find gdb package.")
-    if rpm_bin :
-        gdb_pkg_list = exec_linux("%s -qvl gdb"%rpm_bin).stdout.read()
-    else
-        print("Couldn't find gdb package.")
-        
-    for pkg_list in gdb_pkg_list :
-        if os.path.isfile(pkg_list) :
-            sharedlibs.append(pkg_list)
-    
-    gdb_text = subprocess.Popen("strace gdb -h",stderr=subprocess.PIPE).stderr.read()
-    for line in gdb_text :
-        if not (line.find("^open(\)") or line.find("no such file") or line.find("\tmp") or line.find("\proc") or line.find("\dev")) :
-            shareslibs.append(line.split('"')[1])
-             
-    myset = set(shareslibs)
-    
-    ret = subprocess.Popen("xargs tar cvf %s.%s.%s.tar"%(uname,exec_bin,DATE),shell=True,stdin=myset) 
+if __name__ == '__main__':
 
+    now = localtime()
+    DATE = now.tm_year+now.tm_mon+now.tm_mday+now.tm_hour+now.tm_min
+    uname = gethostname()
+    
+    # option 처리 부분
+    use_desc ="%prog [-h] -c corefile exec_binary "
+    parser = OptionParser(usage=use_desc)
+    parser.add_option("-c",help="core file",dest="corefile")
+    (options, args) = parser.parse_args()
+    corefile = options.corefile
+    execfile = args[0]
+
+    if not (len(args) == 1 and corefile) :
+        parser.print_help()
+        sys.exit(1)
+    
+    if not isfile(execfile) :
+        sys.stderr.write("%s : please input correct executable binary as exec_binary\n" %execfile)
+        parser.print_help()
+        sys.exit(2)
+    
+    if not isfile(corefile) :
+        sys.stderr.write("%s : please input correct corefile as corefile\n" %options.corefile)
+        parser.print_help()
+        sys.exit(2)        
+    
+    musthave_cmdList = ["gdb","ldd","xargs","tar","strace"]
+    whereCmd = {}
+    for cmd in musthave_cmdList :
+        whereCmd[cmd] = isthere(cmd,1)
+
+    retgdb = Popen("%s %s %s -x gdb.cmd"%(whereCmd["gdb"],execfile,corefile),stdout=PIPE,stderr=open("/dev/null")).PIPE.read()
+    sharedlibs =  [ realpath(line) for line in retgdb if line.find(" /") ]
+        
+    util_cmdList = ["bash","ls","cp","grep","cat","diff","tail","head","vi","bc" ]
+    for cmd in util_cmdList :
+        whereCmd[cmd] = isthere(cmd,0)
+        sharedlibs.extend(findLib(whereCmd["ldd"],whereCmd[cmd]))
+        
+    pkg_cmdList = ["dpkg","rpm"]
+    for cmd in pkg_cmdList :
+        whereCmd[cmd] = isthere(cmd,1)
+        if cmd == "dpkg" :
+            dpkg_ret = pkgthere("%s -L gdb"%whereCmd[cmd])
+            for line in dpkg_ret :
+                sharedlibs.append(line)
+        elif cmd == "rpm" :
+            rpm_ret = pkgthere("%s -qvl gdb"%whereCmd[cmd])
+            for line in rpm_ret :
+                sharedlibs.append(line.split()[9])
+    if not (dpkg_ret or rpm_ret) :
+        print("Couldn't find gdb package.")
+        sys.exit(2)
+        
+    
+    for line in pkgthere("%s gdb -h"%whereCmd['strace']) :
+        if line.find('^open(\"/)') :
+            if line.find('no such file') != -1 and line.find('\tmp') != -1 and line.find('\proc') != -1 and line.find('\dev') != -1 :
+                sharedlibs.append(line.split('"')[1])
+     
+    myset = set(sharedlibs)
+    tf = tarfile.open("%s.%s.%s.tar.gz"%(uname,execfile,DATE),"w|gz")
+    for line in myset :
+        tf.add(line)
+    
+    tf.close()
+    # ret = Popen("xargs tar cvf %s.%s.%s.tar"%(uname,execfile,DATE),stdin=myset)  
     
     pass
