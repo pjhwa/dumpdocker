@@ -120,7 +120,7 @@ rpm_bin=$(which rpm 2>/dev/null)
 if [ "x$dpkg_bin" != "x" ] && [ -x $dpkg_bin ]; then
 	$dpkg_bin -l gdb >/dev/null 2>&1
 	if [ $? -eq 0 ]; then
-		$dpkg_bin -L gdb > /tmp/d.pkg.$$ 2>/dev/null
+		$dpkg_bin -L gdb > /tmp/d.pkg.$$ 2>/dev/null 
 	else
 		echo "Couldn't find gdb package."
 		exit 1
@@ -144,8 +144,7 @@ do
 		found_shlibs+=" "
 		found_shlibs+="$pkg_files"
 	fi
-done
-
+don
 # check the files which has opened by gdb
 strace $gdb_bin >/dev/null 2>/tmp/d.$$ <<EOF
 quit
@@ -153,6 +152,8 @@ EOF
 
 gdb_files=$(grep "^open(\"" /tmp/d.$$ | egrep -iv "no such file|\/dev|\/proc|\/tmp" | awk -F'"' '{print $2}')
 for files in $gdb_files
+
+
 do
 	if [ -f $files ]; then
 		if [ -x $files ]; then
