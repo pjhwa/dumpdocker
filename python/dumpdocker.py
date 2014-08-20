@@ -8,7 +8,7 @@ Created on 2014. 8. 19.
 '''
 from os.path import isfile,isdir,realpath,basename
 from optparse import OptionParser
-from time import localtime
+from time import localtime,strftime
 from socket import gethostname
 from subprocess import Popen,PIPE
 import sys,tarfile
@@ -48,8 +48,7 @@ def findLib(whereldd,cmd):
     
 if __name__ == '__main__':
 
-    now = localtime()
-    DATE = str(now.tm_year)+str(now.tm_mon)+str(now.tm_mday)+str(now.tm_hour)+str(now.tm_min)
+    DATE = strftime('%Y%m%d%H%M',localtime())
     uname = gethostname()
     
     # option 처리 부분
