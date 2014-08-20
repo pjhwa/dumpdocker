@@ -16,10 +16,9 @@ import sys,tarfile
 def isthere(cmd,must):
     try :
         ret = Popen(["which",cmd],stdout=PIPE,stderr=open("/dev/null"))
-	#print(ret.stdout.read().strip('\n'))
-	realCmd = realpath(ret.stdout.readline().strip('\n'))
-	if not isdir(realCmd) :
-        	return realCmd
+        realCmd = realpath(ret.stdout.readline().strip('\n'))
+        if not isdir(realCmd) :
+            return realCmd
     except IOError as Ierr :
         sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
         if must :
@@ -27,10 +26,10 @@ def isthere(cmd,must):
 
 def pkgthere(cmd):
     try :
-	libList = []
+        libList = []
         ret = Popen(cmd,stdout=PIPE,stderr=open("/dev/null"))
-	for retline in ret.stdout.readlines() :
-	    libList.append(retline.strip('\t').strip('\n'))
+        for retline in ret.stdout.readlines() :
+            libList.append(retline.strip('\t').strip('\n'))
         return libList
     except IOError as Ierr :
         sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
@@ -40,12 +39,9 @@ def findLib(whereldd,cmd):
         sharedList = []
         ret = Popen([whereldd,cmd],stdout=PIPE,stderr=open("/dev/null"))
         for retline in ret.stdout.readlines() :
-	    line = retline.strip('\t').strip('\n')
+            line = retline.strip('\t').strip('\n')
             if line.find("/") != -1 :
-		#if line.find(' => ') != -1 :
-            		sharedList.append(realpath(line.split(' ')[-2]))
-		#else :
-	#		sharedList.append(realpath(line.split(' ')[-2]))
+                sharedList.append(realpath(line.split(' ')[-2]))
         return sharedList
     except IOError as Ierr :
         sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
@@ -83,6 +79,7 @@ if __name__ == '__main__':
     whereCmd = {}
     for cmd in musthave_cmdList :
         whereCmd[cmd] = isthere(cmd,1)
+        
     retgdb = Popen([whereCmd['gdb'],execfile,corefile,'-x','gdb.cmd'],stdout=PIPE,stderr=open("/dev/null")).stdout.readlines() 
    
     sharedlibs =  [ realpath(line.strip('\n').split(' ')[-1]) for line in retgdb if line.find(" /") != -1 and line.startswith('0x') ]
@@ -95,15 +92,15 @@ if __name__ == '__main__':
     pkg_cmdList = ["dpkg","rpm"]
     for cmd in pkg_cmdList :
         whereCmd[cmd] = isthere(cmd,1)
-	if whereCmd[cmd] :
+        if whereCmd[cmd] :
             if cmd == "dpkg" :
                 pkgList = pkgthere([whereCmd[cmd],'-L','gdb'])
                 for line in pkgList :
-                    sharedlibs.append(line)
+                    sharedlibs.append(realpath(line))
             elif cmd == "rpm" :
                 pkgList = pkgthere([whereCmd[cmd],'-qvl','gdb'])
                 for line in pkgList :
-                    sharedlibs.append(line.split()[8])
+                    sharedlibs.append(realpath(line.split()[8]))
     if not pkgList :
         print("Couldn't find gdb package.")
         sys.exit(2)
@@ -112,19 +109,17 @@ if __name__ == '__main__':
     
     for line in retstrace :
         if line.startswith('open("/') :
-	    retline = line.strip('\n')
+            retline = line.strip('\n')
             if (retline.find(' ENOENT ') == -1  and retline.find(' ENOTDIR ') == -1 and retline.find('/tmp/') == -1 and retline.find('/proc/') == -1 and retline.find('/dev/') == -1) :
-                sharedlibs.append(retline.split('"')[1])
+                sharedlibs.append(realpath(retline.split('"')[1]))
      
     myset = set(sharedlibs)
-	    	
-    #print(sharedlibs)
+
     tf = tarfile.open("%s.%s.%s.tar"%(uname,basename(execfile),DATE),"w")
     for line in myset :
         if isfile(line) :
             tf.add(line)
     
     tf.close()
-    #ret = Popen("xargs tar cvf %s.%s.%s.tar"%(uname,execfile,DATE),stdin=myset)  
     
     pass
