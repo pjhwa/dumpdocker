@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python27
 # -*- coding:utf-8 -*-
 
 '''
@@ -6,8 +6,7 @@ Created on 2014. 8. 19.
 
 @author: earthsea
 '''
-
-from os.path import realpath,isfile
+from os.path import isfile,isdir,realpath,basename
 from optparse import OptionParser
 from time import localtime
 from socket import gethostname
@@ -16,9 +15,11 @@ import sys,tarfile
 
 def isthere(cmd,must):
     try :
-        ret = Popen("which %s"%cmd,stdout=PIPE,stderr=open("/dev/null"))
-        
-        return realpath(ret.PIPE.read())
+        ret = Popen(["which",cmd],stdout=PIPE,stderr=open("/dev/null"))
+	#print(ret.stdout.read().strip('\n'))
+	realCmd = realpath(ret.stdout.readline().strip('\n'))
+	if not isdir(realCmd) :
+        	return realCmd
     except IOError as Ierr :
         sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
         if must :
@@ -26,21 +27,25 @@ def isthere(cmd,must):
 
 def pkgthere(cmd):
     try :
-        ret = Popen("%s"%cmd,stdout=PIPE,stderr=open("/dev/null"))
-        return realpath(ret.PIPE.read())
+	libList = []
+        ret = Popen(cmd,stdout=PIPE,stderr=open("/dev/null"))
+	for retline in ret.stdout.readlines() :
+	    libList.append(retline.strip('\t').strip('\n'))
+        return libList
     except IOError as Ierr :
         sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
     
 def findLib(whereldd,cmd):
     try :
-        ret = Popen("%s %s"%(whereldd,cmd),stdout=PIPE,stderr=open("/dev/null"))
         sharedList = []
-        for line in ret.PIPE.read() :
-            if line.find("/") :
-                if line.find("=>") :
-                    sharedList.append(realpath(line.split("=>")[1]))
-                else :
-                    sharedList.append(realpath(line))
+        ret = Popen([whereldd,cmd],stdout=PIPE,stderr=open("/dev/null"))
+        for retline in ret.stdout.readlines() :
+	    line = retline.strip('\t').strip('\n')
+            if line.find("/") != -1 :
+		#if line.find(' => ') != -1 :
+            		sharedList.append(realpath(line.split(' ')[-2]))
+		#else :
+	#		sharedList.append(realpath(line.split(' ')[-2]))
         return sharedList
     except IOError as Ierr :
         sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
@@ -48,7 +53,7 @@ def findLib(whereldd,cmd):
 if __name__ == '__main__':
 
     now = localtime()
-    DATE = now.tm_year+now.tm_mon+now.tm_mday+now.tm_hour+now.tm_min
+    DATE = str(now.tm_year)+str(now.tm_mon)+str(now.tm_mday)+str(now.tm_hour)+str(now.tm_min)
     uname = gethostname()
     
     # option 처리 부분
@@ -57,11 +62,12 @@ if __name__ == '__main__':
     parser.add_option("-c",help="core file",dest="corefile")
     (options, args) = parser.parse_args()
     corefile = options.corefile
-    execfile = args[0]
 
     if not (len(args) == 1 and corefile) :
         parser.print_help()
         sys.exit(1)
+
+    execfile = args[0]
     
     if not isfile(execfile) :
         sys.stderr.write("%s : please input correct executable binary as exec_binary\n" %execfile)
@@ -77,42 +83,48 @@ if __name__ == '__main__':
     whereCmd = {}
     for cmd in musthave_cmdList :
         whereCmd[cmd] = isthere(cmd,1)
-
-    retgdb = Popen("%s %s %s -x gdb.cmd"%(whereCmd["gdb"],execfile,corefile),stdout=PIPE,stderr=open("/dev/null")).PIPE.read()
-    sharedlibs =  [ realpath(line) for line in retgdb if line.find(" /") ]
+    retgdb = Popen([whereCmd['gdb'],execfile,corefile,'-x','gdb.cmd'],stdout=PIPE,stderr=open("/dev/null")).stdout.readlines() 
+   
+    sharedlibs =  [ realpath(line.strip('\n').split(' ')[-1]) for line in retgdb if line.find(" /") != -1 and line.startswith('0x') ]
         
     util_cmdList = ["bash","ls","cp","grep","cat","diff","tail","head","vi","bc" ]
     for cmd in util_cmdList :
         whereCmd[cmd] = isthere(cmd,0)
-        sharedlibs.extend(findLib(whereCmd["ldd"],whereCmd[cmd]))
+        sharedlibs.extend(findLib(whereCmd['ldd'],whereCmd[cmd]))
         
     pkg_cmdList = ["dpkg","rpm"]
     for cmd in pkg_cmdList :
         whereCmd[cmd] = isthere(cmd,1)
-        if cmd == "dpkg" :
-            dpkg_ret = pkgthere("%s -L gdb"%whereCmd[cmd])
-            for line in dpkg_ret :
-                sharedlibs.append(line)
-        elif cmd == "rpm" :
-            rpm_ret = pkgthere("%s -qvl gdb"%whereCmd[cmd])
-            for line in rpm_ret :
-                sharedlibs.append(line.split()[9])
-    if not (dpkg_ret or rpm_ret) :
+	if whereCmd[cmd] :
+            if cmd == "dpkg" :
+                pkgList = pkgthere([whereCmd[cmd],'-L','gdb'])
+                for line in pkgList :
+                    sharedlibs.append(line)
+            elif cmd == "rpm" :
+                pkgList = pkgthere([whereCmd[cmd],'-qvl','gdb'])
+                for line in pkgList :
+                    sharedlibs.append(line.split()[8])
+    if not pkgList :
         print("Couldn't find gdb package.")
         sys.exit(2)
         
+    retstrace = Popen([whereCmd['strace'],'gdb','-h'],stdout=open('/dev/null'),stderr=PIPE).stderr.readlines()
     
-    for line in pkgthere("%s gdb -h"%whereCmd['strace']) :
-        if line.find('^open(\"/)') :
-            if line.find('no such file') != -1 and line.find('\tmp') != -1 and line.find('\proc') != -1 and line.find('\dev') != -1 :
-                sharedlibs.append(line.split('"')[1])
+    for line in retstrace :
+        if line.startswith('open("/') :
+	    retline = line.strip('\n')
+            if (retline.find(' ENOENT ') == -1  and retline.find(' ENOTDIR ') == -1 and retline.find('/tmp/') == -1 and retline.find('/proc/') == -1 and retline.find('/dev/') == -1) :
+                sharedlibs.append(retline.split('"')[1])
      
     myset = set(sharedlibs)
-    tf = tarfile.open("%s.%s.%s.tar.gz"%(uname,execfile,DATE),"w|gz")
+	    	
+    #print(sharedlibs)
+    tf = tarfile.open("%s.%s.%s.tar"%(uname,basename(execfile),DATE),"w")
     for line in myset :
-        tf.add(line)
+        if isfile(line) :
+            tf.add(line)
     
     tf.close()
-    # ret = Popen("xargs tar cvf %s.%s.%s.tar"%(uname,execfile,DATE),stdin=myset)  
+    #ret = Popen("xargs tar cvf %s.%s.%s.tar"%(uname,execfile,DATE),stdin=myset)  
     
     pass
