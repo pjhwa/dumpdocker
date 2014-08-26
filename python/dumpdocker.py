@@ -143,10 +143,9 @@ if __name__ == '__main__':
      
     myset = set(sharedlibs)
 
-    tf = tarfile.open("%s.%s.%s.tar"%(uname,basename(execfile),DATE),"w")
+    tf = tarfile.open("%s.%s.%s.tar.gz"%(uname,basename(execfile),DATE),"w|gz")
     for line in myset :
-        if isfile(line) :
-            tf.add(line)
+        tf.add(line)
     tf.close()
     
     pass
