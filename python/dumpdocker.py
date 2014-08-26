@@ -1,11 +1,23 @@
+
 #!/usr/bin/python
+#
+#
+# dumpdocker
+# - creates docker image based on tar file for analysis of crash dump 
+# 
+# Requirements:
+# - gdb,ldd,tar,strace
+#
+# Usage:
+# dumpdocker [-h] -c core_file exec_bin 
+#
+# Author: ChongHwa Lee <earthsea@gmail.com>
+# Created on Mon Aug  18 11:23:32 KST 2014
+# Last updated at Tue Aug  26 14:35:29 KST 2014
+#
+#
 # -*- coding:utf-8 -*-
 
-'''
-Created on 2014. 8. 19.
-
-@author: earthsea
-'''
 from os.path import isfile,islink,realpath,basename
 from optparse import OptionParser
 from time import localtime,strftime
@@ -48,7 +60,6 @@ if __name__ == '__main__':
     DATE = strftime('%Y%m%d%H%M',localtime())
     uname = gethostname()
     
-    
     # option 처리 부분
     use_desc ="%prog [-h] -c corefile exec_binary "
     parser = OptionParser(usage=use_desc)
@@ -78,7 +89,7 @@ if __name__ == '__main__':
     sharedlibs = []
     
     # 반드시 필요한 명령어 위치 산출. 없으면 종료.
-    musthave_cmdList = ["gdb","ldd","xargs","tar","strace"]
+    musthave_cmdList = ["gdb","ldd","tar","strace"]
     
     for cmd in musthave_cmdList :
         whereCmd[cmd] = isthere(cmd)
