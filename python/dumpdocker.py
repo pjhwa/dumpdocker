@@ -1,59 +1,63 @@
-#!/usr/bin/python27
+
+#!/usr/bin/python
+#
+#
+# dumpdocker
+# - creates docker image based on tar file for analysis of crash dump 
+# 
+# Requirements:
+# - gdb,ldd,tar,strace
+#
+# Usage:
+# dumpdocker [-h] -c core_file exec_bin 
+#
+# Author: ChongHwa Lee <earthsea@gmail.com>
+# Created on Mon Aug  18 11:23:32 KST 2014
+# Last updated at Tue Aug  26 14:35:29 KST 2014
+#
+#
 # -*- coding:utf-8 -*-
 
-'''
-Created on 2014. 8. 19.
-
-@author: earthsea
-'''
-from os.path import isfile,isdir,realpath,basename
+from os.path import isfile,islink,realpath,basename
 from optparse import OptionParser
-from time import localtime
+from time import localtime,strftime
 from socket import gethostname
 from subprocess import Popen,PIPE
 import sys,tarfile
 
-def isthere(cmd,must):
+def exeComm(cmd,std):
     try :
-        ret = Popen(["which",cmd],stdout=PIPE,stderr=open("/dev/null"))
-	#print(ret.stdout.read().strip('\n'))
-	realCmd = realpath(ret.stdout.readline().strip('\n'))
-	if not isdir(realCmd) :
-        	return realCmd
+        retline = []
+        cmdList = cmd.split()
+        if std == 1 :
+            ret = Popen(cmdList,stdout=PIPE,stderr=open("/dev/null")).stdout
+        elif std == 2 :
+            ret = Popen(cmdList,stderr=PIPE,stdout=open("/dev/null")).stderr
+        for x in ret.readlines() :
+            retline.append(x.strip('\t').strip('\n'))
+        return retline
     except IOError as Ierr :
         sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
-        if must :
-            sys.exit(2)
+        
+def isthere(cmd):
+    path = ''
+    ret = exeComm('which %s'%cmd,1)
+    for line in ret :
+        if isfile(line) :
+            path = realpath(line)        
+    return path
 
-def pkgthere(cmd):
-    try :
-	libList = []
-        ret = Popen(cmd,stdout=PIPE,stderr=open("/dev/null"))
-	for retline in ret.stdout.readlines() :
-	    libList.append(retline.strip('\t').strip('\n'))
-        return libList
-    except IOError as Ierr :
-        sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
-    
-def findLib(whereldd,cmd):
-    try :
-        sharedList = []
-        ret = Popen([whereldd,cmd],stdout=PIPE,stderr=open("/dev/null"))
-        for retline in ret.stdout.readlines() :
-	    line = retline.strip('\t').strip('\n')
-            if line.find("/") != -1 :
-		#if line.find(' => ') != -1 :
-            		sharedList.append(realpath(line.split(' ')[-2]))
-		#else :
-	#		sharedList.append(realpath(line.split(' ')[-2]))
-        return sharedList
-    except IOError as Ierr :
-        sys.stderr.write("%s not found : "%cmd+str(Ierr)+"\n")
-    
+def makeSharedLibs(path):
+    retline = []
+    if isfile(path) :
+        retline.append(realpath(path))
+    if islink(path) :
+        retline.append(path)    
+    return retline
+     
 if __name__ == '__main__':
 
-    now = localtime()
-    DATE = str(now.tm_year)+str(now.tm_mon)+str(now.tm_mday)+str(now.tm_hour)+str(now.tm_min)
+    DATE = strftime('%Y%m%d%H%M',localtime())
     uname = gethostname()
     
     # option 처리 부분
@@ -79,52 +83,69 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(2)        
     
-    musthave_cmdList = ["gdb","ldd","xargs","tar","strace"]
+    # 명령어 위치정보 dictionary
     whereCmd = {}
+    # SharedLib list
+    sharedlibs = []
+    
+    # 반드시 필요한 명령어 위치 산출. 없으면 종료.
+    musthave_cmdList = ["gdb","ldd","tar","strace"]
+    
     for cmd in musthave_cmdList :
-        whereCmd[cmd] = isthere(cmd,1)
-    retgdb = Popen([whereCmd['gdb'],execfile,corefile,'-x','gdb.cmd'],stdout=PIPE,stderr=open("/dev/null")).stdout.readlines() 
-   
-    sharedlibs =  [ realpath(line.strip('\n').split(' ')[-1]) for line in retgdb if line.find(" /") != -1 and line.startswith('0x') ]
+        whereCmd[cmd] = isthere(cmd)
+    if len(whereCmd) != len(musthave_cmdList) :
+        sys.stderr.write("Please Check gdb,ldd,xargs,tar,strace Command")
+        sys.exit(2)
         
+    # gdb 라이브러리 산출
+    retgdb = exeComm('%s %s %s -x gdb.cmd'%(whereCmd['gdb'],execfile,corefile),1)
+    for line in retgdb :
+        if line.find(" /") != -1 and line.startswith('0x') :
+            gdbRaw = line.split()[-1]
+            sharedlibs.extend(makeSharedLibs(gdbRaw))    
+    
+    # 일반 명령어 라이브러리와 바이너리      
     util_cmdList = ["bash","ls","cp","grep","cat","diff","tail","head","vi","bc" ]
     for cmd in util_cmdList :
-        whereCmd[cmd] = isthere(cmd,0)
-        sharedlibs.extend(findLib(whereCmd['ldd'],whereCmd[cmd]))
+        whereCmd[cmd] = isthere(cmd)
+        sharedlibs.append(whereCmd[cmd])
+        retldd = exeComm('%s %s'%(whereCmd['ldd'],whereCmd[cmd]),1)
+        for line in retldd :
+            if line.find(" /") != -1 :
+                lddRaw = realpath(line.split()[-2])
+                sharedlibs.extend(makeSharedLibs(lddRaw))
         
     pkg_cmdList = ["dpkg","rpm"]
     for cmd in pkg_cmdList :
-        whereCmd[cmd] = isthere(cmd,1)
-	if whereCmd[cmd] :
+        whereCmd[cmd] = isthere(cmd)
+        if whereCmd[cmd] :
             if cmd == "dpkg" :
-                pkgList = pkgthere([whereCmd[cmd],'-L','gdb'])
-                for line in pkgList :
-                    sharedlibs.append(line)
+                retpkg = exeComm('%s -L gdb'%whereCmd[cmd],1)
+                for line in retpkg :
+                    sharedlibs.extend(makeSharedLibs(line))
             elif cmd == "rpm" :
-                pkgList = pkgthere([whereCmd[cmd],'-qvl','gdb'])
-                for line in pkgList :
-                    sharedlibs.append(line.split()[8])
-    if not pkgList :
-        print("Couldn't find gdb package.")
+                retpkg =  exeComm('%s -qvl gdb'%whereCmd[cmd],1)
+                for line in retpkg :
+                    lineRaw = line.split()[8]
+                    sharedlibs.extend(makeSharedLibs(lineRaw))                 
+    if not retpkg :
+        sys.stderr.write("Couldn't find dpkg or RPM package.")
         sys.exit(2)
-        
-    retstrace = Popen([whereCmd['strace'],'gdb','-h'],stdout=open('/dev/null'),stderr=PIPE).stderr.readlines()
-    
+
+    # strace 처리 부분
+    retstrace = exeComm('%s gdb -h'%whereCmd['strace'],2)
     for line in retstrace :
         if line.startswith('open("/') :
-	    retline = line.strip('\n')
+            retline = line.strip('\n')
             if (retline.find(' ENOENT ') == -1  and retline.find(' ENOTDIR ') == -1 and retline.find('/tmp/') == -1 and retline.find('/proc/') == -1 and retline.find('/dev/') == -1) :
-                sharedlibs.append(retline.split('"')[1])
+                straceRaw = retline.split('"')[1]
+                sharedlibs.extend(makeSharedLibs(straceRaw))
      
     myset = set(sharedlibs)
-	    	
-    #print(sharedlibs)
-    tf = tarfile.open("%s.%s.%s.tar"%(uname,basename(execfile),DATE),"w")
+
+    tf = tarfile.open("%s.%s.%s.tar.gz"%(uname,basename(execfile),DATE),"w|gz")
     for line in myset :
-        if isfile(line) :
-            tf.add(line)
-    
+        tf.add(line)
     tf.close()
-    #ret = Popen("xargs tar cvf %s.%s.%s.tar"%(uname,execfile,DATE),stdin=myset)  
     
     pass
