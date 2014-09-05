@@ -3,9 +3,7 @@
 creates docker images for analysis of crash dump and generates the first pass dump analysis report from the docker image.
 
 ## Requirements
-gdb (latest version)
-
-strace
+gdb (latest version), strace
 
 ## Usage
 
