@@ -4,6 +4,7 @@ creates docker images for analysis of crash dump and generates the first pass du
 
 ## Requirements
 gdb (latest version)
+
 strace
 
 ## Usage
