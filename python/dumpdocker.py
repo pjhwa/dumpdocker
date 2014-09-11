@@ -112,7 +112,7 @@ if __name__ == '__main__':
         retldd = exeComm('%s %s'%(whereCmd['ldd'],whereCmd[cmd]),1)
         for line in retldd :
             if line.find(" /") != -1 :
-                lddRaw = realpath(line.split()[-2])
+                lddRaw =line.split()[-2]
                 sharedlibs.extend(makeSharedLibs(lddRaw))
         
     pkg_cmdList = ["dpkg","rpm"]
