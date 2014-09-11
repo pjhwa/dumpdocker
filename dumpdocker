@@ -11,7 +11,7 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Aug  6 14:35:29 KST 2014
+# Last updated at Tue Sep 12 08:36:21 KST 2014
 #set -x
 
 prog=$(basename $0)
@@ -93,7 +93,7 @@ do
 done
 
 # basic commands for docker image
-basic_cmds="bash ls cp grep cat diff tail head vi bc"
+basic_cmds="bash ls cp grep cat diff tail head vi awk bc strace"
 
 for commands in $(echo $basic_cmds)
 do
@@ -105,6 +105,8 @@ done
 gdb_bin=$(which gdb)
 found_shlibs+=" "
 found_shlibs+=$(find_shlibs $gdb_bin)
+
+python_ver=$(ldd $gdb_bin | grep python | awk '{print $1}' | cut -c 4-12)
 
 # get the list of gdb package contents
 dpkg_bin=$(which dpkg 2>/dev/null)
@@ -153,6 +155,15 @@ do
 		found_shlibs+=" "$files
 	fi
 done
+
+# add the files of python for gdb
+python_files=$(find /usr/lib/$python_ver)
+for files in $python_files
+do
+	if [ -f $files ]; then
+		found_shlibs+=" "$files
+	fi
+done	
 
 # gather the files of list and archive them into tar file for docker image
 echo $found_shlibs | tr " " "\n" | sort -u | xargs tar cvf ${UNAME}.${BINNAME}.${DATE}.tar 
