@@ -144,7 +144,7 @@ done
 # check the files which has opened by gdb
 strace $gdb_bin -h >/dev/null 2>/tmp/d.$$ 
 
-gdb_files=$(grep "^open(\"" /tmp/d.$$ | egrep -iv "no such file|\/dev|\/proc|\/tmp" | awk -F'"' '{print $2}')
+gdb_files=$(grep "^open(\"" /tmp/d.$$ | egrep -iv "ENOENT|ENOTDIR|\/dev|\/proc|\/tmp" | awk -F'"' '{print $2}')
 for files in $gdb_files
 do
 	if [ -f $files ]; then
@@ -170,4 +170,5 @@ echo $found_shlibs | tr " " "\n" | sort -u | xargs tar cvf ${UNAME}.${BINNAME}.$
 
 # remove the temporary files
 rm /tmp/d.*.$$
+rm /tmp/d.*.tmp
 exit 0
