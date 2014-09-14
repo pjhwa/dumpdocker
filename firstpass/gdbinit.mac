@@ -1,0 +1,4 @@
+file segv-sample
+core-file core
+set height 0
+set width 0
