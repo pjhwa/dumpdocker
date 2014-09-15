@@ -11,7 +11,7 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Sep 12 08:36:21 KST 2014
+# Last updated at Tue Sep 15 17:04:31 KST 2014
 #set -x
 
 prog=$(basename $0)
@@ -164,6 +164,23 @@ do
 		found_shlibs+=" "$files
 	fi
 done	
+
+# create gdbinit.mac for firstpass.sh
+DUMPDOCKER_DIR="/tmp/dumpdocker"
+if [ -d $DUMPDOCKER_DIR ]; then
+	rm -rf $DUMPDOCKER_DIR
+fi
+mkdir $DUMPDOCKER_DIR
+cat >> $DUMPDOCKER_DIR/gdbinit.mac <<EOF
+file $1
+core-file $2
+set height 0
+set width 0
+EOF
+
+cp firstpass/firstpass.sh $DUMPDOCKER_DIR/firstpass.sh
+
+found_shlibs+=" "$DUMPDOCKER_DIR
 
 # gather the files of list and archive them into tar file for docker image
 echo $found_shlibs | tr " " "\n" | sort -u | xargs tar cvf ${UNAME}.${BINNAME}.${DATE}.tar 
