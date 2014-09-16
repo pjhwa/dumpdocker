@@ -1,6 +1,6 @@
 # First Pass Dump Analysis Report
 
-firstpass.sh generates the first pass dump analysis report from the core dump file. This report contains information like the followings:
+firstpass.sh generates the first pass dump analysis report from the core dump file. The default file name is /current working directory/fpreport.out. This report contains information like the followings:
 
 ```
                                        ===============================
