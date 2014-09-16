@@ -22,5 +22,5 @@ Run the following commands on the dump analysis system:
 # docker run -i -v /dump:/dump -t <image_name> /bin/bash
 
 bash-X.X# cd /dump
-bash-X.X# /tmp/dumpdocker/firstpass.sh
+bash-X.X# /opt/dumpdocker/firstpass.sh
 ```

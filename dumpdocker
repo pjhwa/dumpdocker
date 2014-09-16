@@ -17,6 +17,11 @@
 prog=$(basename $0)
 prog_dir=$(dirname $0)
 
+execbin=$(basename $1)
+execbin_dir=$(dirname $1)
+corefile=$(basename $2)
+corefile_dir=$(dirname $2)
+
 usage() {
 	echo "Usage: $prog [-h] exec_bin core_file"
 	echo "    -h		display the usage of $prog"
@@ -103,7 +108,7 @@ do
 done
 
 # basic commands for docker image
-basic_cmds="bash ls cp grep cat diff tail head vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename"
+basic_cmds="bash ls cp grep cat diff tail head vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename python"
 
 for commands in $(echo $basic_cmds)
 do
@@ -191,7 +196,7 @@ fi
 mkdir $DUMPDOCKER_DIR
 cat >> $DUMPDOCKER_DIR/gdbinit.mac <<EOF
 file $1
-core-file $2
+core-file /dump/$corefile
 set height 0
 set width 0
 EOF
@@ -205,6 +210,7 @@ found_shlibs+=" $DUMPDOCKER_DIR/gdbinit.mac"
 echo $found_shlibs | tr " " "\n" | sort -u | tar cvf ${UNAME}.${BINNAME}.${DATE}.tar --files-from -
 
 # remove the temporary files
+rm /tmp/d.$$
 rm /tmp/d.*.$$
 rm /tmp/d.*.tmp
 exit 0
