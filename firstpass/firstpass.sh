@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-# firstpass.sh v1.1
+# firstpass.sh version 1.11
 # - generates first pass dump analysis report  
 #  
 # Requirements: 
@@ -8,39 +8,69 @@
 # 
 # Usage: 
 # In the dumpdocker environment
-# cd /dump
-# /tmp/dumpdocker/firstpass.sh 
+# cd /opt/dumpdocker
+# /opt/dumpdocker/firstpass.sh 
 # 
 # Author: Younghun Chung <younghun.chung@gmail.com> 
 # Created on Mon Sep 14 23:10:11 KST 2014 
-# Last updated at Tue Sep 15 17:16:31 KST 2014 
+# Last updated at Tue Sep 16 16:29:12 KST 2014
 # set -x 
 
 # =============================================================================
 # First pass report file name and version
 # =============================================================================
 REPORT="./fpreport.out"
-VERSION="version 1.1"
+VERSION="version 1.11"
 
 # =============================================================================
 # Temporary directory and gdb macro file name
 # =============================================================================
 TEMP_DIR="./temp"
-GDBMACRO="/tmp/dumpdocker/gdbinit.mac"
+GDBMACRO="/opt/dumpdocker/gdbinit.mac"
 
 # =============================================================================
-# Clean-up previous reports and making the report directory
+# Checking GDBMACRO, clean-up previous reports and making the report directory
 # =============================================================================
-rm $REPORT
-rm -rf "$TEMP_DIR"
+if [[ -f $GDBMACRO ]]
+then
+	:
+else
+	echo "Error: $GDBMACRO file does not exist."
+	exit
+fi
+
+if [[ -f $REPORT ]]
+then
+	rm $REPORT
+fi
+if [[ -d $TEMP_DIR ]]
+then
+	rm -rf "$TEMP_DIR"
+fi
 mkdir "$TEMP_DIR"
 
 # =============================================================================
-# Report title
+# Report title, checking executable file and core dump
 # =============================================================================
 TIMESTAMP=$(date)
 EXEC_FILE=$(grep file $GDBMACRO | grep -v "core-file" | awk '{print $2}')
 CORE_FILE=$(grep core-file $GDBMACRO | awk '{print $2}')
+
+if [[ -f $EXEC_FILE ]]
+then
+	:
+else
+	echo "ERROR: $GDBMACRO: $EXEC_FILE does not exists."
+	exit
+fi
+
+if [[ -f $CORE_FILE ]]
+then
+	:
+else
+	echo "ERROR: $GDBMACRO: $CORE_FILE does not exists."
+	exit
+fi
 
 printf "%70s\n"   "===============================" >> $REPORT
 printf "%70s\n"   "First Pass Dump Analysis Report" >> $REPORT
@@ -289,7 +319,7 @@ CRASH_IP=$(grep ^#$CRASH_FRAME $TEMP_DIR/bt.out | awk '{print $2}')
 
 echo "
 source $GDBMACRO
-set logging file $TEMP_DIR/crashframe_source.out
+set logging file $TEMP_DIR/crashframe.out
 set logging on
 echo \n
 echo 4. The failed frame #$CRASH_FRAME\n
@@ -300,14 +330,39 @@ echo 5. The information of the failed frame #$CRASH_FRAME\n
 echo =========================================\n
 info frame $CRASH_FRAME
 echo \n
+set logging off
+set logging file $TEMP_DIR/checksrc.out
+set logging on
+info source
+info line
+set logging off
+quit " > $COMMAND
+
+gdb -batch -x $COMMAND
+
+NOCURSRC=$(grep "No current source" $TEMP_DIR/checksrc.out | wc -l)
+
+# =============================================================================
+# Code checking (source code, assembly code)
+# =============================================================================
+COMMAND="$TEMP_DIR/gdbcom6.txt"
+
+echo "
+source $GDBMACRO
+frame $CRASH_FRAME
+set logging file $TEMP_DIR/sourceinfo.out
+set logging on
 echo 6. Source code information\n
 echo ==========================\n
 info source
-echo \n
 info line
-echo \n
-list
-echo \n
+echo \n " >> $COMMAND
+if [[ $NOCURSRC -eq 0 ]] # NOCURSRC == 0 means that the source infomation is available.
+then
+	echo "list"    >> $COMMAND
+	echo "echo \n" >> $COMMAND
+fi
+echo "
 set logging off 
 set logging file $TEMP_DIR/asmcode.out
 set logging on
@@ -326,39 +381,39 @@ echo =======================\n
 info reg
 echo \n
 set logging off
-quit " > $COMMAND	
+quit " >> $COMMAND	
 
 gdb -batch -x $COMMAND
 
 # =============================================================================
 # Checking local source directory
 # =============================================================================
-NOCURSRC=$(grep "No current source" $TEMP_DIR/crashframe_source.out | wc -l)
 if [[ $NOCURSRC -eq 1 ]] # Current frame has no source code information
 then
-	echo "NOTE:"                                                                 >> $TEMP_DIR/crashframe_source.out
-	echo "##################################################################"   >> $TEMP_DIR/crashframe_source.out
-	echo "The crashed frame has no source code information."                    >> $TEMP_DIR/crashframe_source.out
-	echo "##################################################################"   >> $TEMP_DIR/crashframe_source.out
-	echo ""                                                                     >> $TEMP_DIR/crashframe_source.out
+	echo "NOTE:"                                                                 >> $TEMP_DIR/sourceinfo.out
+	echo "##################################################################"    >> $TEMP_DIR/sourceinfo.out
+	echo "The crashed frame has no source code information."                     >> $TEMP_DIR/sourceinfo.out
+	echo "##################################################################"    >> $TEMP_DIR/sourceinfo.out
+	echo ""                                                                      >> $TEMP_DIR/sourceinfo.out
 else
-	SRCDIR=$(grep "Located in" $TEMP_DIR/crashframe_source.out | wc -l)
+	SRCDIR=$(grep "Located in" $TEMP_DIR/sourceinfo.out | wc -l)
 	if [[ $SRCDIR -eq 0 ]] # Source directory is not specified
 	then
-		SRCFILE=$(grep "Current source" $TEMP_DIR/crashframe_source.out | awk '{print $5}')
+		SRCFILE=$(grep "Current source" $TEMP_DIR/sourceinfo.out | awk '{print $5}')
 		SRCDIR=$(dirname $SRCFILE)
-		echo "NOTE:"                                                                >> $TEMP_DIR/crashframe_source.out
-		echo "##################################################################"   >> $TEMP_DIR/crashframe_source.out
-		echo "Please add the following line to the $GDBMACRO file"                  >> $TEMP_DIR/crashframe_source.out
-		if [[ $SRCDIR=="\." ]]
+		echo ""                                                                   >> $TEMP_DIR/sourceinfo.out
+		echo "NOTE:"                                                              >> $TEMP_DIR/sourceinfo.out
+		echo "##################################################################" >> $TEMP_DIR/sourceinfo.out
+		echo "Please add the following line to the $GDBMACRO file"                >> $TEMP_DIR/sourceinfo.out
+		if [[ "$SRCDIR" == "\." ]]
 		then
-			echo "	directory <your source directory>"                          >> $TEMP_DIR/crashframe_source.out
+			echo "   directory <your source directory>"                            >> $TEMP_DIR/sourceinfo.out
 		else
-			echo "	set substitute-path $SRCDIR <your source directory>"        >> $TEMP_DIR/crashframe_source.out
+			echo "	set substitute-path $SRCDIR <your source directory>"          >> $TEMP_DIR/sourceinfo.out
 		fi	
-		echo "to list the crashed source code."                                     >> $TEMP_DIR/crashframe_source.out
-		echo "##################################################################"   >> $TEMP_DIR/crashframe_source.out
-		echo ""                                                                     >> $TEMP_DIR/crashframe_source.out
+		echo "to list the crashed source code."                                   >> $TEMP_DIR/sourceinfo.out
+		echo "##################################################################" >> $TEMP_DIR/sourceinfo.out
+		echo ""                                                                   >> $TEMP_DIR/sourceinfo.out
 	fi
 fi
 
@@ -369,7 +424,7 @@ if [[ $SIGNAL -eq 11 ]] || [[ $SIGNAL -eq 10 ]] || [[ $SIGNAL -eq 7 ]]
 then
 	FAILED_INSTRUCTION=$(grep "^Failed Instruction" $TEMP_DIR/asmcode.out | cut -d ":" -f2)
 	ASMCOM=$(echo $FAILED_INSTRUCTION | awk '{print $1}')
-	if [[ $ASMCOM=="mov" ]]
+	if [[ "$ASMCOM" == "mov" ]]
 	then
 		OPERANDS=$(echo $FAILED_INSTRUCTION | awk '{print $2}')
 		SRC_OP=$(echo "$OPERANDS" | cut -d "," -f1 | cut -c 3-5)
@@ -386,9 +441,10 @@ then
 	# add another assembly command case here
 fi
 
-cat $TEMP_DIR/crashframe_source.out >> $REPORT
-cat $TEMP_DIR/asmcode.out           >> $REPORT
-cat $TEMP_DIR/register.out          >> $REPORT
+cat $TEMP_DIR/crashframe.out >> $REPORT
+cat $TEMP_DIR/sourceinfo.out >> $REPORT
+cat $TEMP_DIR/asmcode.out    >> $REPORT
+cat $TEMP_DIR/register.out   >> $REPORT
 
 # =============================================================================
 # Virtual address space
