@@ -1,6 +1,6 @@
 # dumpdocker
 
-creates docker images for analysis of crash dump and generates the first pass dump analysis report from the docker image.
+creates docker image for analysis of crash dump and generates the first pass dump analysis report from the docker image.
 
 ## Requirements
 gdb (latest version), strace
@@ -22,5 +22,5 @@ Run the following commands on the dump analysis system:
 # docker run -i -v /dump:/dump -t <image_name> /bin/bash
 
 bash-X.X# cd /dump
-bash-X.X# gdb /path/executable ./core_file
+bash-X.X# /tmp/dumpdocker/firstpass.sh
 ```

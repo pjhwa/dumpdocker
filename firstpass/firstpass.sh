@@ -1,14 +1,32 @@
 #!/bin/bash
+# 
+# firstpass.sh v1.1
+# - generates first pass dump analysis report  
+#  
+# Requirements: 
+# - gdb 
+# 
+# Usage: 
+# In the dumpdocker environment
+# cd /dump
+# /tmp/dumpdocker/firstpass.sh 
+# 
+# Author: Younghun Chung <younghun.chung@gmail.com> 
+# Created on Mon Sep 14 23:10:11 KST 2014 
+# Last updated at Tue Sep 15 17:16:31 KST 2014 
+# set -x 
 
 # =============================================================================
-# Report file name
+# First pass report file name and version
 # =============================================================================
-REPORT="./report.out"
+REPORT="./fpreport.out"
+VERSION="version 1.1"
 
 # =============================================================================
-# Temporary directory and temporary gdb command file name
+# Temporary directory and gdb macro file name
 # =============================================================================
 TEMP_DIR="./temp"
+GDBMACRO="/tmp/dumpdocker/gdbinit.mac"
 
 # =============================================================================
 # Clean-up previous reports and making the report directory
@@ -21,13 +39,13 @@ mkdir "$TEMP_DIR"
 # Report title
 # =============================================================================
 TIMESTAMP=$(date)
-EXEC_FILE=$(grep file ./gdbinit.mac | grep -v "core-file" | awk '{print $2}')
-CORE_FILE=$(grep core-file ./gdbinit.mac | awk '{print $2}')
+EXEC_FILE=$(grep file $GDBMACRO | grep -v "core-file" | awk '{print $2}')
+CORE_FILE=$(grep core-file $GDBMACRO | awk '{print $2}')
 
 printf "%70s\n"   "===============================" >> $REPORT
 printf "%70s\n"   "First Pass Dump Analysis Report" >> $REPORT
 printf "%70s\n"   "===============================" >> $REPORT
-printf "%70s\n" "version 1.0"                       >> $REPORT
+printf "%70s\n" "$VERSION"                          >> $REPORT
 printf "$TIMESTAMP\n\n"                             >> $REPORT
 printf "Exec file name : %s\n"   "$EXEC_FILE"       >> $REPORT
 printf "Core file name : %s\n\n" "$CORE_FILE"       >> $REPORT
@@ -35,7 +53,7 @@ printf "Core file name : %s\n\n" "$CORE_FILE"       >> $REPORT
 printf "Table of contents\n"                       >> $REPORT
 printf "=================\n"                       >> $REPORT
 printf " 1. General information\n"                 >> $REPORT
-printf " 2. Environment varialbes\n"               >> $REPORT
+printf " 2. Environment variables\n"               >> $REPORT
 printf " 3. Stacktrace\n"                          >> $REPORT
 printf " 4. The failed frame\n"                    >> $REPORT
 printf " 5. The information of the failed frame\n" >> $REPORT
@@ -54,7 +72,7 @@ COMMAND="$TEMP_DIR/gdbcom1.txt"
 echo "
 set logging file $TEMP_DIR/info.out
 set logging on
-source gdbinit.mac
+source $GDBMACRO
 set logging off
 
 set logging file $TEMP_DIR/bt.out
@@ -109,7 +127,7 @@ COMMAND="$TEMP_DIR/gdbcom2.txt"
 MAIN_FUNC_FRAME=$(cat $TEMP_DIR/thread-1.bt.out | awk '{print $1}' | cut -d"#" -f2)
 
 echo "
-source gdbinit.mac
+source $GDBMACRO
 thread 1
 frame $MAIN_FUNC_FRAME
 set logging file $TEMP_DIR/thread-1.frame.out
@@ -136,7 +154,7 @@ done
 RBP=$(cat $TEMP_DIR/rbp.out)
 
 echo "
-source gdbinit.mac
+source $GDBMACRO
 thread 1
 frame $MAIN_FUNC_FRAME
 set logging file $TEMP_DIR/rbp_dump.out
@@ -169,7 +187,7 @@ ENVBASE=$(cat $TEMP_DIR/env_base.out)
 COMMAND="$TEMP_DIR/gdbcom4.txt"
 
 echo "
-source gdbinit.mac
+source $GDBMACRO
 thread 1
 frame $MAIN_FUNC_FRAME
 x /gx $ENVBASE+0x18
@@ -270,7 +288,7 @@ fi
 CRASH_IP=$(grep ^#$CRASH_FRAME $TEMP_DIR/bt.out | awk '{print $2}')
 
 echo "
-source gdbinit.mac
+source $GDBMACRO
 set logging file $TEMP_DIR/crashframe_source.out
 set logging on
 echo \n
@@ -329,14 +347,14 @@ else
 	then
 		SRCFILE=$(grep "Current source" $TEMP_DIR/crashframe_source.out | awk '{print $5}')
 		SRCDIR=$(dirname $SRCFILE)
-		echo "NOTE:"                                                                 >> $TEMP_DIR/crashframe_source.out
+		echo "NOTE:"                                                                >> $TEMP_DIR/crashframe_source.out
 		echo "##################################################################"   >> $TEMP_DIR/crashframe_source.out
-		echo "Please add the following line to the ~/gdbinit.mac file"              >> $TEMP_DIR/crashframe_source.out
+		echo "Please add the following line to the $GDBMACRO file"                  >> $TEMP_DIR/crashframe_source.out
 		if [[ $SRCDIR=="\." ]]
 		then
-			echo "	directory <your source directory>"                              >> $TEMP_DIR/crashframe_source.out
+			echo "	directory <your source directory>"                          >> $TEMP_DIR/crashframe_source.out
 		else
-			echo "	set substitute-path $SRCDIR <your source directory>"            >> $TEMP_DIR/crashframe_source.out
+			echo "	set substitute-path $SRCDIR <your source directory>"        >> $TEMP_DIR/crashframe_source.out
 		fi	
 		echo "to list the crashed source code."                                     >> $TEMP_DIR/crashframe_source.out
 		echo "##################################################################"   >> $TEMP_DIR/crashframe_source.out
