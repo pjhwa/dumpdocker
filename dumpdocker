@@ -4,17 +4,18 @@
 # - creates docker image based on tar file for analysis of crash dump 
 # 
 # Requirements:
-# - gdb
+# - gdb, strace
 #
 # Usage:
 # dumpdocker [-h] exec_bin core_file
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Sep 15 17:04:31 KST 2014
+# Last updated at Tue Sep 16 15:08:12 KST 2014
 #set -x
 
 prog=$(basename $0)
+prog_dir=$(dirname $0)
 
 usage() {
 	echo "Usage: $prog [-h] exec_bin core_file"
@@ -84,7 +85,16 @@ core="$2"
 found_shlibs+=" "
 found_shlibs+=$(check_links $file) 
 
-gdb $file $core -x gdb.cmd > /dev/null
+#gdb $file $core -x gdb.cmd > /dev/null
+gdb $file $core >> /dev/null <<EOF
+set height 0
+set width 0
+set logging file /tmp/d.gdb.tmp
+set logging on
+info shared
+set logging off
+quit
+EOF
 
 for sharedlibs in $(grep "\/" /tmp/d.gdb.tmp | awk -F' /' '{print "/"$2}')
 do
@@ -93,13 +103,21 @@ do
 done
 
 # basic commands for docker image
-basic_cmds="bash ls cp grep cat diff tail head vi awk bc strace"
+basic_cmds="bash ls cp grep cat diff tail head vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename"
 
 for commands in $(echo $basic_cmds)
 do
 	found_shlibs+=" "
-	found_shlibs+=$(find_shlibs $(check_path $commands))
+	found_shlibs+=$(find_shlibs $(check_links $(check_path $commands)))
 done
+
+alternative_files=$(find /etc/alternatives)
+for files in $alternative_files
+do
+	if [ -f $files ]; then
+		found_shlibs+=" "$files
+	fi
+done	
 
 # gather the shared libraries and binaries related with gdb
 gdb_bin=$(which gdb)
@@ -166,7 +184,7 @@ do
 done	
 
 # create gdbinit.mac for firstpass.sh
-DUMPDOCKER_DIR="/tmp/dumpdocker"
+DUMPDOCKER_DIR="/opt/dumpdocker"
 if [ -d $DUMPDOCKER_DIR ]; then
 	rm -rf $DUMPDOCKER_DIR
 fi
@@ -178,12 +196,13 @@ set height 0
 set width 0
 EOF
 
-cp firstpass/firstpass.sh $DUMPDOCKER_DIR/firstpass.sh
+cp $prog_dir/firstpass/firstpass.sh $DUMPDOCKER_DIR/firstpass.sh
 
-found_shlibs+=" "$DUMPDOCKER_DIR
+found_shlibs+=" $DUMPDOCKER_DIR/firstpass.sh"
+found_shlibs+=" $DUMPDOCKER_DIR/gdbinit.mac"
 
 # gather the files of list and archive them into tar file for docker image
-echo $found_shlibs | tr " " "\n" | sort -u | xargs tar cvf ${UNAME}.${BINNAME}.${DATE}.tar 
+echo $found_shlibs | tr " " "\n" | sort -u | tar cvf ${UNAME}.${BINNAME}.${DATE}.tar --files-from -
 
 # remove the temporary files
 rm /tmp/d.*.$$
