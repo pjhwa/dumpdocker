@@ -11,16 +11,19 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Sep 16 15:08:12 KST 2014
+# Last updated at Fri Nov 28 17:01:18 KST 2014
 #set -x
 
+ver="1.2.0"
 prog=$(basename $0)
 prog_dir=$(dirname $0)
 
-execbin=$(basename $1)
-execbin_dir=$(dirname $1)
-corefile=$(basename $2)
-corefile_dir=$(dirname $2)
+execbin=$(basename $1 2>/dev/null)
+execbin_dir=$(dirname $1 2>/dev/null)
+corefile=$(basename $2 2>/dev/null)
+corefile_dir=$(dirname $2 2>/dev/null)
+
+echo "dumpdocker $ver"
 
 usage() {
 	echo "Usage: $prog [-h] exec_bin core_file"
@@ -87,11 +90,12 @@ file="$1"
 core="$2"
 
 # find shared libraries for the given file from info shared command of gdb
+echo "Gathering the shared libraries and files related with $file."
 found_shlibs+=" "
 found_shlibs+=$(check_links $file) 
 
 #gdb $file $core -x gdb.cmd > /dev/null
-gdb $file $core >> /dev/null <<EOF
+gdb $file $core >> /dev/null 2> /dev/null <<EOF
 set height 0
 set width 0
 set logging file /tmp/d.gdb.tmp
@@ -108,7 +112,8 @@ do
 done
 
 # basic commands for docker image
-basic_cmds="bash ls cp grep cat diff tail head vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename python"
+echo "Including the basic commands for dump analysis."
+basic_cmds="bash ls cp mv file grep cat diff tail head vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename python"
 
 for commands in $(echo $basic_cmds)
 do
@@ -123,6 +128,21 @@ do
 		found_shlibs+=" "$files
 	fi
 done	
+
+# gather the magic files which are file command refers
+strace file /usr/bin/bc > /dev/null 2> /tmp/d.file.$$ 
+
+magic_files=$(grep "^open(\"" /tmp/d.file.$$ | egrep -iv "ENOENT|ENOTDIR|\/dev|\/proc|\/tmp" | egrep -i "magic" | awk -F'"' '{print $2}')
+for files in $magic_files
+do
+	if [ -f $files ]; then
+		if [ -x $files ]; then
+			found_shlibs+=" "
+			found_shlibs+=$(find_shlibs $files)
+		fi
+		found_shlibs+=" "$files
+	fi
+done
 
 # gather the shared libraries and binaries related with gdb
 gdb_bin=$(which gdb)
@@ -189,6 +209,7 @@ do
 done	
 
 # create gdbinit.mac for firstpass.sh
+echo "Generating the files related with firstpass.sh."
 DUMPDOCKER_DIR="/opt/dumpdocker"
 if [ -d $DUMPDOCKER_DIR ]; then
 	rm -rf $DUMPDOCKER_DIR
@@ -207,10 +228,14 @@ found_shlibs+=" $DUMPDOCKER_DIR/firstpass.sh"
 found_shlibs+=" $DUMPDOCKER_DIR/gdbinit.mac"
 
 # gather the files of list and archive them into tar file for docker image
-echo $found_shlibs | tr " " "\n" | sort -u | tar cvf ${UNAME}.${BINNAME}.${DATE}.tar --files-from -
+echo "Archiving the files into ${UNAME}.${BINNAME}.${DATE}.tar file."
+echo $found_shlibs | tr " " "\n" | sort -u | tar cf ${UNAME}.${BINNAME}.${DATE}.tar --files-from - 2>/dev/null
 
 # remove the temporary files
+echo "Removing the temporary files."
 rm /tmp/d.$$
 rm /tmp/d.*.$$
 rm /tmp/d.*.tmp
+
+echo "Done."
 exit 0
