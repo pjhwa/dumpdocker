@@ -223,6 +223,7 @@ set width 0
 EOF
 
 cp $prog_dir/firstpass/firstpass.sh $DUMPDOCKER_DIR/firstpass.sh
+chmod +x $DUMPDOCKER_DIR/firstpass.sh
 
 found_shlibs+=" $DUMPDOCKER_DIR/firstpass.sh"
 found_shlibs+=" $DUMPDOCKER_DIR/gdbinit.mac"
