@@ -113,7 +113,7 @@ done
 
 # basic commands for docker image
 echo "Including the basic commands for dump analysis."
-basic_cmds="bash ls cp mv file grep cat diff tail head vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename python less"
+basic_cmds="bash ls cp mv file grep cat diff tail head vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename python less nm objdump"
 
 for commands in $(echo $basic_cmds)
 do
