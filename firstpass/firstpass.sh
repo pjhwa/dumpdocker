@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-# firstpass.sh version 1.11
+# firstpass.sh version 1.12
 # - generates first pass dump analysis report  
 #  
 # Requirements: 
@@ -13,14 +13,14 @@
 # 
 # Author: Younghun Chung <younghun.chung@gmail.com> 
 # Created on Mon Sep 14 23:10:11 KST 2014 
-# Last updated at Tue Sep 16 16:29:12 KST 2014
+# Last updated at Tue Sep 16 19:13:54 KST 2014
 # set -x 
 
 # =============================================================================
 # First pass report file name and version
 # =============================================================================
 REPORT="./fpreport.out"
-VERSION="version 1.11"
+VERSION="version 1.12"
 
 # =============================================================================
 # Temporary directory and gdb macro file name
@@ -188,39 +188,58 @@ source $GDBMACRO
 thread 1
 frame $MAIN_FUNC_FRAME
 set logging file $TEMP_DIR/rbp_dump.out
-set logging on
-x /40gx $RBP
+set logging on" > $COMMAND
+
+for (( i=0 ; i<40; i++ ))
+do
+	(( OFFSET=i*8 ))
+	echo "x /gx $RBP+$OFFSET" >> $COMMAND
+done
+
+echo "
 set logging off
-quit " > $COMMAND
+quit " >> $COMMAND
 
 gdb -batch -x $COMMAND
 
+PREV_VALUE=""
 cat $TEMP_DIR/rbp_dump.out |
 while read LINE
 do
-   ADDR1=$(echo $LINE | cut -d":" -f1)
-   ADDR2=$(echo $LINE | awk '{print $2}')
-   U_ADDR1=$(echo $ADDR1 | tr '[:lower:]' '[:upper:]' | cut -d"X" -f2)
-   U_ADDR2=$(echo $ADDR2 | tr '[:lower:]' '[:upper:]' | cut -d"X" -f2)
+   CUR_ADDR=$(echo $LINE | cut -d":" -f1)
+   CUR_VALUE=$(echo $LINE | awk '{print $2}')
 
-   OFFSET=$(echo 'ibase=16;obase=A;'$U_ADDR2'-'$U_ADDR1 | bc)
-   echo $OFFSET
-   if [[ $OFFSET -eq 8 ]]
+	if [[ "$PREV_VALUE" == "" ]]
+	then
+		PREV_VALUE=$CUR_VALUE
+		continue
+	fi
+	
+   U_CUR_ADDR=$(echo $CUR_ADDR | tr '[:lower:]' '[:upper:]' | cut -d"X" -f2)
+   U_PREV_VALUE=$(echo $PREV_VALUE | tr '[:lower:]' '[:upper:]' | cut -d"X" -f2)
+	U_CUR_VALUE=$(echo $CUR_VALUE | tr '[:lower:]' '[:upper:]' | cut -d"X" -f2)	
+
+   OFFSET=$(echo 'ibase=16;obase=A;'$U_CUR_ADDR'-'$U_PREV_VALUE | bc)
+	A_CUR_VALUE=$(echo 'ibase=16;obase=A;'$U_CUR_VALUE | bc)
+
+   if [[ $OFFSET -eq 0 ]] && [[ $A_CUR_VALUE -eq 28 ]]
    then
-      echo "$ADDR1" > $TEMP_DIR/env_base.out
+		ENVBASE="$CUR_ADDR"
+		echo "$ENVBASE" > $TEMP_DIR/envbase.out
 		break
-   fi
+	else
+		PREV_VALUE=$CUR_VALUE
+	fi
 done
 
-ENVBASE=$(cat $TEMP_DIR/env_base.out)
-
+ENVBASE=$(cat $TEMP_DIR/envbase.out)
 COMMAND="$TEMP_DIR/gdbcom4.txt"
 
 echo "
 source $GDBMACRO
 thread 1
 frame $MAIN_FUNC_FRAME
-x /gx $ENVBASE+0x18
+x /gx $ENVBASE+0x10
 set logging file $TEMP_DIR/temp.out
 set logging on
 x /1000s \$__
@@ -231,7 +250,7 @@ gdb -batch -x $COMMAND
 
 echo "2. Environment variables" >> $REPORT
 echo "========================" >> $REPORT
-grep -v "out of bounds" $TEMP_DIR/temp.out | grep -v "\"\"" | awk '{print $2}' | cut -d"\"" -f2>> $REPORT
+grep -v "out of bounds" $TEMP_DIR/temp.out | grep -v -i "cannot access memory" | grep -v "\"\"" | awk '{print $2}' | cut -d"\"" -f2>> $REPORT
 echo "" >> $REPORT
 
 # =============================================================================
@@ -309,7 +328,7 @@ then
 else
 	echo "NOTE:"                                                              >> $REPORT
 	echo "##################################################################" >> $REPORT
-	echo "The process failed due to unknown reason."                          >> $REPORT
+	echo "The process failed due to unknown reason. (maybe user initiated) "  >> $REPORT
 	echo "Please check from the first frame crashed.     "                    >> $REPORT
 	echo "##################################################################" >> $REPORT
 	CRASH_FRAME=0
@@ -498,8 +517,8 @@ echo ""                              >> $REPORT
 # =============================================================================
 # Shared library information 
 # =============================================================================
-echo "Checking shared libraies" 
-echo "========================"
+echo "Checking shared libray" 
+echo "======================"
 echo "11. Shared library information" >> $REPORT
 echo "==============================" >> $REPORT
 cat $TEMP_DIR/shared.out          >> $REPORT
