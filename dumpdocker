@@ -11,7 +11,7 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Sep 16 15:08:12 KST 2014
+# Last updated at Fri Aug  7 09:32:55 KST 2015
 #set -x
 
 prog=$(basename $0)
@@ -23,7 +23,7 @@ corefile=$(basename $2)
 corefile_dir=$(dirname $2)
 
 usage() {
-	echo "Usage: $prog [-h] exec_bin core_file"
+	echo "Usage: $prog [-h] $PWD/exec_bin core_file"
 	echo "    -h		display the usage of $prog"
 	echo ""
 }
@@ -108,7 +108,7 @@ do
 done
 
 # basic commands for docker image
-basic_cmds="bash ls cp grep cat diff tail head vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename python"
+basic_cmds="bash ls cp grep cat diff tail head less vi awk bc strace rm mkdir date printf echo cut tr wc dirname basename python"
 
 for commands in $(echo $basic_cmds)
 do
