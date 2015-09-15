@@ -11,10 +11,10 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Fri Aug  7 09:35:32 KST 2015
+# Last updated at Tue Sep 15 13:13:31 KST 2015
 #set -x
 
-ver="1.2.0"
+ver="1.4.0"
 prog=$(basename $0)
 prog_dir=$(dirname $0)
 
@@ -62,6 +62,10 @@ check_links() {
 	if [[ -L $file ]]; then
 		echo $file 
 		readlink -f $file
+		if [ "$(dirname $file)" != "$(dirname $(readlink -f $file))" ]; then
+			echo $(dirname $(readlink -f $file))/$(basename $file)
+			echo $(dirname $file)/$(basename $(readlink -f $file))
+		fi	
 	else
 		echo $file
 	fi
@@ -84,6 +88,12 @@ find_shlibs() {
 	do
 		check_links $shlibs
 	done
+}
+
+get_sysinfo() {
+	dmidecode > /tmp/d.dmi.$$
+	cat /proc/cpuinfo > /tmp/d.cpu.$$
+	cat /proc/meminfo > /tmp/d.mem.$$	
 }
 
 file="$1"
@@ -150,6 +160,17 @@ found_shlibs+=" "
 found_shlibs+=$(find_shlibs $gdb_bin)
 
 python_ver=$(ldd $gdb_bin | grep python | awk '{print $1}' | cut -c 4-12)
+python_ver2=$(echo $python_ver | sed -e 's/python//' | cut -c 1)
+
+if [ $python_ver2 -lt 3 ]; then
+	python_libs="python-libs"
+	libpython="libpython-stdlib"
+        sys_path=$(python -c 'import sys;print sys.path' | sed -e 's/\[//' -e 's/\]//' -e 's/,//g' -e 's/'\''//g')
+else
+	python_libs="python3-libs"
+	libpython="libpython3-stdlib"
+        sys_path=$(python3 -c 'import sys;print(sys.path)' | sed -e 's/\[//' -e 's/\]//' -e 's/,//g' -e 's/'\''//g')
+fi
 
 # get the list of gdb package contents
 dpkg_bin=$(which dpkg 2>/dev/null)
@@ -163,6 +184,13 @@ if [ "x$dpkg_bin" != "x" ] && [ -x $dpkg_bin ]; then
 		echo "Couldn't find gdb package."
 		exit 1
 	fi
+	$dpkg_bin -l $libpython >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		$dpkg_bin -L $libpython >> /tmp/d.pkg.$$ 2>/dev/null
+	else
+		echo "Couldn't find $libpython package."
+		exit 1
+	fi
 elif [ "x$rpm_bin" != "x" ] && [ -x $rpm_bin ]; then
 	$rpm_bin -q gdb	>/dev/null 2>&1
 	if [ $? -eq 0 ]; then
@@ -171,10 +199,23 @@ elif [ "x$rpm_bin" != "x" ] && [ -x $rpm_bin ]; then
 		echo "Couldn't find gdb package."
 		exit 1
 	fi
+	$rpm_bin -q $python_libs >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		$rpm_bin -qvl $python_libs | awk '{print $9}' >> /tmp/d.pkg.$$ 2>/dev/null
+	else
+		echo "Couldn't find $python_libs package."
+		exit 1
+	fi
 else
-	echo "Couldn't find dpkg and rpm binary."
+	echo "Couldn't find dpkg or rpm binary."
 	exit 1
 fi
+
+# get the file list from python sys.path
+for syspath in $sys_path
+do
+	find $syspath -type f -print >> /tmp/d.pkg.$$ 2> /dev/null
+done
 
 for pkg_files in $(cat /tmp/d.pkg.$$)
 do
@@ -187,7 +228,7 @@ done
 # check the files which has opened by gdb
 strace $gdb_bin -h >/dev/null 2>/tmp/d.$$ 
 
-gdb_files=$(grep "^open(\"" /tmp/d.$$ | egrep -iv "ENOENT|ENOTDIR|\/dev|\/proc|\/tmp" | awk -F'"' '{print $2}')
+gdb_files=$(egrep "^open\(|^stat\(" /tmp/d.$$ | egrep -iv "ENOENT|ENOTDIR|\/dev|\/proc|\/tmp" | awk -F'"' '{print $2}')
 for files in $gdb_files
 do
 	if [ -f $files ]; then
@@ -200,6 +241,7 @@ do
 done
 
 # add the files of python for gdb
+
 python_files=$(find /usr/lib/$python_ver)
 for files in $python_files
 do
@@ -227,6 +269,17 @@ chmod +x $DUMPDOCKER_DIR/firstpass.sh
 
 found_shlibs+=" $DUMPDOCKER_DIR/firstpass.sh"
 found_shlibs+=" $DUMPDOCKER_DIR/gdbinit.mac"
+
+cp /tmp/d.dmi.$$ $DUMPDOCKER_DIR/dmidecode.txt
+cp /tmp/d.cpu.$$ $DUMPDOCKER_DIR/cpuinfo.txt
+cp /tmp/d.mem.$$ $DUMPDOCKER_DIR/meminfo.txt
+
+found_shlibs+=" $DUMPDOCKER_DIR/dmidecode.txt"
+found_shlibs+=" $DUMPDOCKER_DIR/cpuinfo.txt"
+found_shlibs+=" $DUMPDOCKER_DIR/meminfo.txt"
+
+#echo $found_shlibs | tr " " "\n" | sort -u > $DUMPDOCKER_DIR/ls-1R
+#found_shlibs+=" $DUMPDOCKER_DIR/ls-1R"
 
 # gather the files of list and archive them into tar file for docker image
 echo "Archiving the files into ${UNAME}.${BINNAME}.${DATE}.tar file."
