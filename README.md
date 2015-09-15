@@ -2,10 +2,10 @@
 
 creates docker image for analysis of crash dump and generates the first pass dump analysis report from the docker image.
 
-## Requirements
+### Requirements
 gdb (latest version), strace
 
-## Usage
+### Usage
 
 Run dumpdocker from the crashed server:
 
@@ -27,7 +27,7 @@ bash-X.X# cd /dump
 bash-X.X# /opt/dumpdocker/firstpass.sh
 ```
 
-## Samples
+### Samples
 
 There is a sample source code in the samples directory. You can test dumpdocker or check the first pass report from the sample.
 
