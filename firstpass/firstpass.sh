@@ -12,21 +12,23 @@
 # /opt/dumpdocker/firstpass.sh 
 # 
 # Author: Younghun Chung <younghun.chung@gmail.com> 
+#         Jerry Park <jaehwa@gmail.com>
 # Created on Mon Sep 14 23:10:11 KST 2014 
-# Last updated at Tue Sep 16 19:13:54 KST 2014
+# Last updated at Tue Sep 15 13:30:04 KST 2015
 # set -x 
 
 # =============================================================================
 # First pass report file name and version
 # =============================================================================
 REPORT="./fpreport.out"
-VERSION="version 1.12"
+VERSION="version 1.13"
 
 # =============================================================================
 # Temporary directory and gdb macro file name
 # =============================================================================
 TEMP_DIR="./temp"
 GDBMACRO="/opt/dumpdocker/gdbinit.mac"
+DUMPDOCKER_DIR="/opt/dumpdocker"
 
 # =============================================================================
 # Checking GDBMACRO, clean-up previous reports and making the report directory
@@ -93,7 +95,10 @@ printf " 8. Register information\n"                >> $REPORT
 printf " 9. Virtual address space\n"               >> $REPORT
 printf "10. Thread information\n"                  >> $REPORT
 printf "11. Shared library information\n"          >> $REPORT
-printf "12. Full stacktrace\n\n"                   >> $REPORT
+printf "12. Full stacktrace\n"                     >> $REPORT
+printf "13. DMI table contents\n"                  >> $REPORT
+printf "14. CPU information\n"                     >> $REPORT
+printf "15. Memory information\n\n"                >> $REPORT
 
 # =============================================================================
 # Run basic analysis
@@ -533,3 +538,41 @@ echo "12. Full stacktrace"    >> $REPORT
 echo "==================="    >> $REPORT
 cat $TEMP_DIR/bt_full.out >> $REPORT
 echo ""                   >> $REPORT
+
+# =============================================================================
+# DMI table contents
+# =============================================================================
+echo "Checking DMI table contents"
+echo "==========================="
+echo "13. DMI table contents"    >> $REPORT
+echo "======================"    >> $REPORT
+grep "dmidecode not found." $DUMPDOCKER_DIR/dmidecode.txt > /dev/null
+if [ $? -eq 0 ]; then
+	echo "No DMI table contents found." >> $REPORT
+else
+	cat $DUMPDOCKER_DIR/dmidecode.txt   >> $REPORT
+fi
+echo ""                                     >> $REPORT
+
+# =============================================================================
+# CPU information
+# =============================================================================
+echo "Checking CPU information"
+echo "========================"
+echo "14. CPU information"    >> $REPORT
+echo "==================="    >> $REPORT
+cat $DUMPDOCKER_DIR/cpuinfo.txt >> $REPORT
+echo ""                         >> $REPORT
+
+# =============================================================================
+# Memory information
+# =============================================================================
+echo "Checking Memory information"
+echo "==========================="
+echo "15. Memory information"    >> $REPORT
+echo "======================"    >> $REPORT
+cat $DUMPDOCKER_DIR/meminfo.txt >> $REPORT
+echo ""                         >> $REPORT
+
+rm -rf $TEMP_DIR
+exit 0

@@ -11,10 +11,10 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Sep 15 13:13:31 KST 2015
+# Last updated at Tue Sep 15 13:46:08 KST 2015
 #set -x
 
-ver="1.4.0"
+ver="1.4.1"
 prog=$(basename $0)
 prog_dir=$(dirname $0)
 
@@ -91,7 +91,12 @@ find_shlibs() {
 }
 
 get_sysinfo() {
-	dmidecode > /tmp/d.dmi.$$
+        dmidecode_bin=$(which dmidecode)
+        if [ "x$dmidecode_bin" != "x" ] && [ -x $dmidecode_bin ]; then
+		$dmidecode_bin > /tmp/d.dmi.$$
+	else
+		echo "dmidecode not found." > /tmp/d.dmi.$$
+	fi
 	cat /proc/cpuinfo > /tmp/d.cpu.$$
 	cat /proc/meminfo > /tmp/d.mem.$$	
 }
@@ -269,6 +274,8 @@ chmod +x $DUMPDOCKER_DIR/firstpass.sh
 
 found_shlibs+=" $DUMPDOCKER_DIR/firstpass.sh"
 found_shlibs+=" $DUMPDOCKER_DIR/gdbinit.mac"
+
+get_sysinfo
 
 cp /tmp/d.dmi.$$ $DUMPDOCKER_DIR/dmidecode.txt
 cp /tmp/d.cpu.$$ $DUMPDOCKER_DIR/cpuinfo.txt
