@@ -11,10 +11,10 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Sep 15 13:46:08 KST 2015
+# Last updated at Tue Sep 15 17:07:43 KST 2015
 #set -x
 
-ver="1.4.1"
+ver="1.4.2"
 prog=$(basename $0)
 prog_dir=$(dirname $0)
 
@@ -54,6 +54,19 @@ fi
 DATE=$(date +%Y%m%d%H%M)
 UNAME=$(uname -n)
 BINNAME=$(basename $1)
+
+check_prereq() {
+	prereq="gdb strace"
+
+	for bins in $prereq
+	do
+		which $bins >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			printf "$prog: $bins package must be installed,\nbut $bins not found on this system.\n\n"
+			exit 1
+		fi
+	done
+}
 
 check_links() {
 	# check the file whether it is a symbolic link file or not
@@ -103,6 +116,8 @@ get_sysinfo() {
 
 file="$1"
 core="$2"
+
+check_prereq
 
 # find shared libraries for the given file from info shared command of gdb
 echo "Gathering the shared libraries and files related with $file."
