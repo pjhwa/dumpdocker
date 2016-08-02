@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-# firstpass.sh version 1.12
+# firstpass.sh version 1.14
 # - generates first pass dump analysis report  
 #  
 # Requirements: 
@@ -21,7 +21,7 @@
 # First pass report file name and version
 # =============================================================================
 REPORT="./fpreport.out"
-VERSION="version 1.13"
+VERSION="version 1.14"
 
 # =============================================================================
 # Temporary directory and gdb macro file name
@@ -54,7 +54,7 @@ mkdir "$TEMP_DIR"
 # =============================================================================
 # Report title, checking executable file and core dump
 # =============================================================================
-TIMESTAMP=$(date)
+TIMESTAMP=$(LANG=C date)
 EXEC_FILE=$(grep file $GDBMACRO | grep -v "core-file" | awk '{print $2}')
 CORE_FILE=$(grep core-file $GDBMACRO | awk '{print $2}')
 

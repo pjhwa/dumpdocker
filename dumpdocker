@@ -11,10 +11,10 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Sep 15 17:07:43 KST 2015
+# Last updated at Tue Aug  2 10:52:17 KST 2016
 #set -x
 
-ver="1.4.2"
+ver="1.4.4"
 prog=$(basename $0)
 prog_dir=$(dirname $0)
 
@@ -302,6 +302,10 @@ found_shlibs+=" $DUMPDOCKER_DIR/meminfo.txt"
 
 #echo $found_shlibs | tr " " "\n" | sort -u > $DUMPDOCKER_DIR/ls-1R
 #found_shlibs+=" $DUMPDOCKER_DIR/ls-1R"
+
+echo "Making the firstpass report..."
+cd $DUMPDOCKER_DIR
+./firstpass.sh > /dev/null
 
 # gather the files of list and archive them into tar file for docker image
 echo "Archiving the files into ${UNAME}.${BINNAME}.${DATE}.tar file."

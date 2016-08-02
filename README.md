@@ -27,6 +27,8 @@ bash-X.X# cd /dump
 bash-X.X# /opt/dumpdocker/firstpass.sh
 ```
 
+You can review the firstpass report before moving core file to the dump analysis system. The firstpass report, fpreport.out file will be located in /opt/dumpdocker/ directory.
+
 ### Samples
 
 There is a sample source code in the samples directory. You can test dumpdocker or check the first pass report from the sample.
