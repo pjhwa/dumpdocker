@@ -9,12 +9,12 @@
 # Usage:
 # dumpdocker [-h] exec_bin core_file
 #
-# Author: Jerry Park <jaehwa@gmail.com>
+# Author: Jerry Park <jaehwa@gmail.com>, Yoonsuk Cho <isempty@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Tue Aug  2 10:52:17 KST 2016
+# Last updated at Mon Jun 19 22:09:54 KST 2017
 #set -x
 
-ver="1.4.4"
+ver="1.4.5"
 prog=$(basename $0)
 prog_dir=$(dirname $0)
 
@@ -72,15 +72,17 @@ check_links() {
 	# check the file whether it is a symbolic link file or not
 	local file="$1"
 	
-	if [[ -L $file ]]; then
-		echo $file 
-		readlink -f $file
-		if [ "$(dirname $file)" != "$(dirname $(readlink -f $file))" ]; then
-			echo $(dirname $(readlink -f $file))/$(basename $file)
-			echo $(dirname $file)/$(basename $(readlink -f $file))
-		fi	
-	else
-		echo $file
+	if test ! -z $file ; then
+        	if [[ -L $file ]]; then
+			echo $file 
+			readlink -f $file
+			if [ "$(dirname $file)" != "$(dirname $(readlink -f $file))" ]; then
+				echo $(dirname $(readlink -f $file))/$(basename $file)
+				echo $(dirname $file)/$(basename $(readlink -f $file))
+			fi	
+		else
+			echo $file
+		fi
 	fi
 }
 
@@ -95,12 +97,14 @@ find_shlibs() {
 	# find the list of shared libraries and binaries for the given file
 	local file="$1"
 
-	check_links $file
-	ldd_files=$(ldd $file | grep "\/" | awk '{if ($2=="=>") print $3; if ($2!="=>") print $1}')
-	for shlibs in $ldd_files
-	do
-		check_links $shlibs
-	done
+	if test ! -z $file ; then
+		check_links $file
+		ldd_files=$(ldd $file | grep "\/" | awk '{if ($2=="=>") print $3; if ($2!="=>") print $1}')
+		for shlibs in $ldd_files
+		do
+			check_links $shlibs
+		done
+	fi
 }
 
 get_sysinfo() {
@@ -308,7 +312,7 @@ cd $DUMPDOCKER_DIR
 ./firstpass.sh > /dev/null
 
 # gather the files of list and archive them into tar file for docker image
-echo "Archiving the files into ${UNAME}.${BINNAME}.${DATE}.tar file."
+echo "Archiving the files into ${DUMPDOCKER_DIR}/${UNAME}.${BINNAME}.${DATE}.tar file."
 echo $found_shlibs | tr " " "\n" | sort -u | tar cf ${UNAME}.${BINNAME}.${DATE}.tar --files-from - 2>/dev/null
 
 # remove the temporary files
