@@ -11,7 +11,7 @@
 #
 # Author: Jerry Park <jaehwa@gmail.com>, Yoonsuk Cho <isempty@gmail.com>
 # Created on Mon Aug  4 11:23:32 KST 2014
-# Last updated at Mon Jun 19 22:09:54 KST 2017
+# Last updated at Thu Jul 27 20:36:21 KST 2017
 #set -x
 
 ver="1.4.5"
@@ -186,13 +186,27 @@ found_shlibs+=$(find_shlibs $gdb_bin)
 python_ver=$(ldd $gdb_bin | grep python | awk '{print $1}' | cut -c 4-12)
 python_ver2=$(echo $python_ver | sed -e 's/python//' | cut -c 1)
 
+if [ -x "/usr/bin/lsb_release" ]; then
+        DIST_ID=$(/usr/bin/lsb_release -i -s | tr "\\n" " " | sed -e 's/ *\$//g' -e 's/ $//g')
+fi
+
 if [ $python_ver2 -lt 3 ]; then
-	python_libs="python-libs"
-	libpython="libpython-stdlib"
+        if [ "$DIST_ID" == "SUSE LINUX" ]; then
+                python_libs_name="libpython2"
+                python_libs=$(/bin/rpm -qa | grep $python_libs_name | grep -v "32bit")
+        else
+                python_libs="python-libs"
+                libpython="libpython-stdlib"
+        fi
         sys_path=$(python -c 'import sys;print sys.path' | sed -e 's/\[//' -e 's/\]//' -e 's/,//g' -e 's/'\''//g')
 else
-	python_libs="python3-libs"
-	libpython="libpython3-stdlib"
+        if [ "$DIST_ID" == "SUSE LINUX" ]; then
+                python_libs_name="libpython3"
+                python_libs=$(/bin/rpm -qa | grep $python_libs_name | grep -v "32bit")
+        else
+                python_libs="python3-libs"
+                libpython="libpython3-stdlib"
+        fi
         sys_path=$(python3 -c 'import sys;print(sys.path)' | sed -e 's/\[//' -e 's/\]//' -e 's/,//g' -e 's/'\''//g')
 fi
 
